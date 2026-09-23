@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>ทดสอบ Google Login → Backend</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body style="font-family: sans-serif; max-width: 640px; margin: 40px auto; line-height:1.5;">
+  <h2>ทดสอบ Login ผ่าน Google → service_income_expenese</h2>
+  <p>Backend ต้องรันอยู่ที่ <code>http://localhost:4000</code> (npm run start:dev)</p>
+
+  <div id="g_id_onload"
+       data-client_id="751462173073-oiikar4oij38m7dsd5ag7h01vsstf955.apps.googleusercontent.com"
+       data-callback="handleCredentialResponse">
+  </div>
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <div style="margin-top:20px; display:flex; gap:8px;">
+    <button onclick="testRefresh()">POST /auth/refresh</button>
+    <button onclick="testMe()">GET /auth/me</button>
+    <button onclick="testLogout()">POST /auth/logout</button>
+  </div>
+
+  <pre id="output" style="white-space: pre-wrap; background:#f4f4f4; padding:12px; margin-top:20px; border-radius:6px;"></pre>
+
+  <script>
+    const BACKEND_URL = 'http://localhost:4000';
+    const output = document.getElementById('output');
+
+    function log(label, status, data) {
+      const line = `[${new Date().toLocaleTimeString()}] ${label}${status !== undefined ? ' (' + status + ')' : ''}\n${JSON.stringify(data, null, 2)}`;
+      output.textContent = line + '\n\n' + output.textContent;
+    }
+
+    async function handleCredentialResponse(response) {
+      log('Google ID token (ตัดสั้น)', undefined, response.credential.slice(0, 40) + '...');
+      try {
+        const res = await fetch(`${BACKEND_URL}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ idToken: response.credential }),
+        });
+        const data = await res.json();
+        window.__accessToken = data.accessToken;
+        log('POST /auth/google', res.status, data);
+        if (res.ok) await testMe();
+      } catch (err) {
+        log('POST /auth/google — ERROR', undefined, String(err));
+      }
+    }
+
+    async function testMe() {
+      const res = await fetch(`${BACKEND_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${window.__accessToken ?? ''}` },
+      });
+      const data = await res.json();
+      log('GET /auth/me', res.status, data);
+    }
+
+    async function testRefresh() {
+      const res = await fetch(`${BACKEND_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      window.__accessToken = data.accessToken;
+      log('POST /auth/refresh', res.status, data);
+    }
+
+    async function testLogout() {
+      const res = await fetch(`${BACKEND_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await res.json();
+      log('POST /auth/logout', res.status, data);
+    }
+  </script>
+</body>
+</html>

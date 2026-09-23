@@ -25,6 +25,95 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Authentication API (Google Login)
+
+Backend ทำ login ผ่าน Google OAuth (ID token flow) ด้วย JWT access token + refresh token (เก็บใน httpOnly cookie)
+
+- Base URL: `http://localhost:4000` (ตาม `PORT` ใน `.env`)
+- ทุก request จาก frontend ต้องส่ง `credentials: 'include'` เพื่อให้ refresh token cookie ทำงาน
+- Access token อายุ 15 นาที (`JWT_ACCESS_EXPIRES_IN`), refresh token อายุ 30 วัน (`JWT_REFRESH_EXPIRES_IN`) และ rotate ทุกครั้งที่ refresh
+
+### POST /auth/google
+
+Verify Google ID token แล้ว login/สมัครสมาชิกอัตโนมัติ
+
+Request body:
+
+```json
+{
+  "idToken": "<Google ID token จาก Google Identity Services>"
+}
+```
+
+Response 200 (และ set cookie `refresh_token`, path `/auth`):
+
+```json
+{
+  "accessToken": "<JWT access token>",
+  "user": {
+    "id": "clx...",
+    "email": "user@example.com",
+    "name": "User Name",
+    "avatarUrl": "https://..."
+  }
+}
+```
+
+Error 401:
+
+```json
+{
+  "statusCode": 401,
+  "message": "Google ID token ไม่ถูกต้องหรือหมดอายุ",
+  "error": "Unauthorized"
+}
+```
+
+### POST /auth/refresh
+
+อ่าน cookie `refresh_token`, ออก access token ใหม่ + rotate refresh token (ไม่ต้องส่ง body)
+
+Response 200:
+
+```json
+{ "accessToken": "<JWT access token ใหม่>" }
+```
+
+### POST /auth/logout
+
+Revoke refresh token ปัจจุบันและล้าง cookie
+
+Response 200:
+
+```json
+{ "success": true }
+```
+
+### GET /auth/me
+
+ต้องแนบ header `Authorization: Bearer <accessToken>`
+
+Response 200:
+
+```json
+{
+  "id": "clx...",
+  "email": "user@example.com",
+  "name": "User Name",
+  "avatarUrl": "https://..."
+}
+```
+
+Response 401 ถ้าไม่มี/หมดอายุ token
+
+### หมายเหตุสำหรับ Frontend
+
+- ส่ง `credentials: 'include'` ทุก request ที่เกี่ยวกับ auth
+- เก็บ `accessToken` ใน memory (เช่น React state/context) เท่านั้น ห้ามเก็บใน `localStorage`
+- ตอนโหลดแอปครั้งแรก เรียก `POST /auth/refresh` ก่อน เพื่อขอ accessToken ใหม่ (ถ้ามี refresh token cookie อยู่แล้ว)
+- `GOOGLE_CLIENT_ID` ต้องตรงกันทั้งฝั่ง frontend และ backend
+- ทดสอบ flow ได้โดยไม่ต้องแก้ frontend จริง ผ่านโฟลเดอร์ `manual-test/` (`manual-test/google-login-test.html` + `node manual-test/serve-test.js`)
+
 ## Project setup
 
 ```bash
